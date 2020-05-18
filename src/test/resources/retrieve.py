@@ -2,14 +2,18 @@
 # encoding: utf-8
 from annoy import AnnoyIndex
 
+test_dims = [64]
+
 
 def do(indextype):
-    a = AnnoyIndex(8, indextype[0])
-    a.load('points.%s.annoy' % indextype)
-    with open('points.%s.ann.txt' % indextype, 'w') as out:
-        for q_index in [1443, 1240, 818, 1725, 1290, 2031, 1117, 1211, 1902, 603]:
-            nns = a.get_nns_by_item(q_index, 10)
-            print >> out, '%s\t%s' % (q_index, ','.join([str(n) for n in nns]))
+    for dim in test_dims:
+        a = AnnoyIndex(dim, indextype)
+        a.load('points.{}.annoy.{}'.format(indextype, dim))
+        with open('points.{}.ann.{}.txt'.format(indextype, dim), 'w') as out:
+            for q_index in range(a.get_n_items()):
+                nns = a.get_nns_by_item(q_index, 21)
+                out.write('{}\t{}\n'.format(q_index, ','.join([str(n) for n in nns])))
+
 
 do('angular')
 do('dot')

@@ -59,9 +59,9 @@ public class ANNIndex implements AnnoyIndex {
   }
 
   ANNIndex(final int dimension,
-                  final String filename,
-                  IndexType indexType,
-                  final int blockSize) throws IOException {
+           final String filename,
+           IndexType indexType,
+           final int blockSize) throws IOException {
     DIMENSION = dimension;
     INDEX_TYPE = indexType;
     INDEX_TYPE_OFFSET = INDEX_TYPE.getOffset();
@@ -187,7 +187,17 @@ public class ANNIndex implements AnnoyIndex {
   }
 
   public static float cosineMargin(final float[] u, final float[] v) {
-    return dot(u, v) / (norm(u) * norm(v));
+    return dot(u, v);
+  }
+
+  public static float cosineDistance(final float[] u, final float[] v) {
+    float pp = dot(u, v);
+    float pp_qq = norm(u) * norm(v);
+    if (pp_qq > 0) {
+      return (float)(2.0 - 2.0 * pp / pp_qq);
+    } else {
+      return (float) 2.0;
+    }
   }
 
   public static float dotMargin(final float[] u, final float[] v, final float norm) {
@@ -268,6 +278,7 @@ public class ANNIndex implements AnnoyIndex {
       long topNodeOffset = top.nodeOffset;
       int nDescendants = getIntInAnnBuf(topNodeOffset);
       float[] v = getNodeVector(topNodeOffset);
+      float d = top.margin;
       if (nDescendants == 1) {  // n_descendants
         // FIXME: does this ever happen?
         if (isZeroVec(v))
@@ -284,13 +295,13 @@ public class ANNIndex implements AnnoyIndex {
         }
       } else {
         float margin = (INDEX_TYPE == IndexType.ANGULAR) ? cosineMargin(v, queryVector)
-                     : (INDEX_TYPE == IndexType.DOT) ? dotMargin(v, queryVector, getDotFactor(topNodeOffset))
-                     : euclideanMargin(v, queryVector, getNodeBias(topNodeOffset));
+                : (INDEX_TYPE == IndexType.DOT) ? dotMargin(v, queryVector, getDotFactor(topNodeOffset))
+                : euclideanMargin(v, queryVector, getNodeBias(topNodeOffset));
         long childrenMemOffset = topNodeOffset + INDEX_TYPE_OFFSET;
         long lChild = NODE_SIZE * getIntInAnnBuf(childrenMemOffset);
         long rChild = NODE_SIZE * getIntInAnnBuf(childrenMemOffset + 4);
-        pq.add(new PQEntry(-margin, lChild));
-        pq.add(new PQEntry(margin, rChild));
+        pq.add(new PQEntry(Math.min(d, -margin), lChild));
+        pq.add(new PQEntry(Math.min(margin, d), rChild));
       }
     }
 
@@ -298,9 +309,9 @@ public class ANNIndex implements AnnoyIndex {
     for (int nn : nearestNeighbors) {
       float[] v = getItemVector(nn);
       if (!isZeroVec(v)) {
-        float margin = (INDEX_TYPE == IndexType.ANGULAR) ? cosineMargin(v, queryVector)
-                     : (INDEX_TYPE == IndexType.DOT) ? dot(v, queryVector)
-                     : -euclideanDistance(v, queryVector);
+        float margin = (INDEX_TYPE == IndexType.ANGULAR) ? -cosineDistance(v, queryVector)
+                : (INDEX_TYPE == IndexType.DOT) ? dot(v, queryVector)
+                : -euclideanDistance(v, queryVector);
         sortedNNs.add(new PQEntry(margin, nn));
       }
     }

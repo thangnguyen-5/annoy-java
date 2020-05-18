@@ -7,56 +7,61 @@ import org.junit.runners.JUnit4;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 @RunWith(JUnit4.class)
 public class ANNIndexTest {
 
   private static final String DIR = "src/test/resources";
+  private static final List<Integer> DIMS = Arrays.asList(64);
 
   private void testIndex(IndexType type, int blockSize, boolean verbose)
           throws IOException {
 
     String ts = type.toString().toLowerCase();
-    ANNIndex index = new ANNIndex(8,
-            String.format("%s/points.%s.annoy", DIR, ts), type, blockSize);
-    BufferedReader reader = new BufferedReader(new FileReader(
-            String.format("%s/points.%s.ann.txt", DIR, ts)));
+    for (int dim : DIMS) {
+      System.out.println(String.format("Testing with dim = %d", dim));
 
-    while (true) {
+      ANNIndex index = new ANNIndex(dim,
+              String.format("%s/points.%s.annoy.%d", DIR, ts, dim), type, blockSize);
+      BufferedReader reader = new BufferedReader(new FileReader(
+              String.format("%s/points.%s.ann.%d.txt", DIR, ts, dim)));
+      int acceptable = 0;
+      int total = 0;
+      while (true) {
+        // read in expected results from file (precomputed from c++ version)
+        String line = reader.readLine();
+        if (line == null)
+          break;
+        total += 1;
+        String[] _l = line.split("\t");
+        Integer queryItemIndex = Integer.parseInt(_l[0]);
+        List<Integer> expectedResults = new LinkedList<>();
+        for (String _i : _l[1].split(","))
+          expectedResults.add(Integer.parseInt(_i));
 
-      // read in expected results from file (precomputed from c++ version)
-      String line = reader.readLine();
-      if (line == null)
-        break;
-      String[] _l = line.split("\t");
-      Integer queryItemIndex = Integer.parseInt(_l[0]);
-      List<Integer> expectedResults = new LinkedList<>();
-      for (String _i : _l[1].split(","))
-        expectedResults.add(Integer.parseInt(_i));
+        // do the query
+        float[] itemVector = index.getItemVector(queryItemIndex);
+        List<Integer> retrievedResults = index.getNearest(itemVector, 21);
 
-      // do the query
-      float[] itemVector = index.getItemVector(queryItemIndex);
-      List<Integer> retrievedResults = index.getNearest(itemVector, 10);
+        if (verbose) {
+          System.out.println(String.format("query: %d", queryItemIndex));
+          for (int i = 0; i < 21; i++)
+            System.out.println(String.format("expected %6d retrieved %6d",
+                    expectedResults.get(i),
+                    retrievedResults.get(i)));
+          System.out.println();
+        }
 
-      if (verbose) {
-        System.out.println(String.format("query: %d", queryItemIndex));
-        for (int i = 0; i < 10; i++)
-          System.out.println(String.format("expected %6d retrieved %6d",
-                  expectedResults.get(i),
-                  retrievedResults.get(i)));
-        System.out.println();
+        Set<Integer> totRes = new TreeSet<>();
+        totRes.addAll(expectedResults);
+        totRes.retainAll(retrievedResults);
+        if (totRes.size() >= 10) {
+          acceptable += 1;
+        }
       }
-
-      // results will not match exactly, but at least 5/10 should overlap
-      Set<Integer> totRes = new TreeSet<>();
-      totRes.addAll(expectedResults);
-      totRes.retainAll(retrievedResults);
-      assert (totRes.size() >= 5);
-
+      System.out.println(String.format("Acceptable: %s\nTotal: %s\nCoverage: %s", acceptable, total, (double)acceptable / total * 100.0));
+      assert (acceptable > total * 90 / 100);
     }
   }
 

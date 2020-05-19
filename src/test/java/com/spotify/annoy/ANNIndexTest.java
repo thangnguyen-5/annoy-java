@@ -56,12 +56,12 @@ public class ANNIndexTest {
         Set<Integer> totRes = new TreeSet<>();
         totRes.addAll(expectedResults);
         totRes.retainAll(retrievedResults);
-        if (totRes.size() >= 10) {
+        if (totRes.size() >= 15) {
           acceptable += 1;
         }
       }
       System.out.println(String.format("Acceptable: %s\nTotal: %s\nCoverage: %s", acceptable, total, (double)acceptable / total * 100.0));
-      assert (acceptable > total * 90 / 100);
+      assert (acceptable > total * 95 / 100);
     }
   }
 

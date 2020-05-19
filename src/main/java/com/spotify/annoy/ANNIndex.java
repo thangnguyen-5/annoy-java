@@ -119,6 +119,17 @@ public class ANNIndex implements AnnoyIndex {
       blockSize = BLOCK_SIZE;
       position -= blockSize;
     }
+    if (roots.size() > 1) {
+      long nodeOffset1 = roots.get(0);
+      long nodeOffset2 = roots.get(roots.size() - 1);
+      long childrenMemOffset1 = nodeOffset1 + INDEX_TYPE_OFFSET;
+      long childrenMemOffset2 = nodeOffset2 + INDEX_TYPE_OFFSET;
+      long lChild1 = NODE_SIZE * getIntInAnnBuf(childrenMemOffset1);
+      long lChild2 = NODE_SIZE * getIntInAnnBuf(childrenMemOffset2);
+      if (lChild1 == lChild2) {
+        roots.remove(roots.size() - 1);
+      }
+    }
   }
 
   private float getFloatInAnnBuf(long pos) {
@@ -243,6 +254,9 @@ public class ANNIndex implements AnnoyIndex {
 
     @Override
     public int compareTo(final PQEntry o) {
+      if (o.margin == margin) {
+        return Float.compare(o.nodeOffset, nodeOffset);
+      }
       return Float.compare(o.margin, margin);
     }
 
@@ -279,6 +293,7 @@ public class ANNIndex implements AnnoyIndex {
       int nDescendants = getIntInAnnBuf(topNodeOffset);
       float[] v = getNodeVector(topNodeOffset);
       float d = top.margin;
+//      System.out.println(String.format("%f %d", d, (int)topNodeOffset / NODE_SIZE));
       if (nDescendants == 1) {  // n_descendants
         // FIXME: does this ever happen?
         if (isZeroVec(v))
@@ -297,6 +312,7 @@ public class ANNIndex implements AnnoyIndex {
         float margin = (INDEX_TYPE == IndexType.ANGULAR) ? cosineMargin(v, queryVector)
                 : (INDEX_TYPE == IndexType.DOT) ? dotMargin(v, queryVector, getDotFactor(topNodeOffset))
                 : euclideanMargin(v, queryVector, getNodeBias(topNodeOffset));
+//        System.out.println(margin);
         long childrenMemOffset = topNodeOffset + INDEX_TYPE_OFFSET;
         long lChild = NODE_SIZE * getIntInAnnBuf(childrenMemOffset);
         long rChild = NODE_SIZE * getIntInAnnBuf(childrenMemOffset + 4);

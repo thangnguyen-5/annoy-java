@@ -239,6 +239,7 @@ public class ANNIndex implements AnnoyIndex {
    */
   @Override
   public void close() throws IOException {
+//    System.out.println("duck");
     memoryMappedFile.close();
   }
 
@@ -382,4 +383,14 @@ public class ANNIndex implements AnnoyIndex {
     }
   }
 
+  @Override
+  protected void finalize() throws Throwable {
+    try {
+      close();
+    } catch (Throwable t) {
+      throw t;
+    } finally {
+      super.finalize();
+    }
+  }
 }
